@@ -27,6 +27,5 @@ Stop the services with `docker compose down`. Playwright is a frontend
 development dependency, not part of either runtime image. The same test can run
 in a Testkube browser container once the PR preview exists.
 
-The frontend uses `package-lock.json`. The backend pins direct dependencies in
-`backend/requirements.in` and locks their transitive versions in
-`backend/requirements.txt` with `uv pip compile` for Python 3.12.
+The frontend uses `package-lock.json`. The backend keeps its direct and
+transitive dependency versions together in `backend/requirements.txt`.
