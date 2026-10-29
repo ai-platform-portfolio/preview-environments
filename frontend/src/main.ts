@@ -1,5 +1,3 @@
-import './style.css';
-
 const button = document.querySelector<HTMLButtonElement>('#check-api');
 const result = document.querySelector<HTMLParagraphElement>('#result');
 
