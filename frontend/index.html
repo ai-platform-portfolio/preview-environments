@@ -8,8 +8,16 @@
   <body>
     <main>
       <h1>Preview environment</h1>
-      <p>A small frontend and API for delivery checks.</p>
-      <button id="check-api" type="button">Check API</button>
+      <form id="message-form">
+        <label for="message">Message</label>
+        <input id="message" name="message" required maxlength="500" />
+        <button type="submit">Save message</button>
+      </form>
+      <form id="read-form">
+        <label for="message-id">Message ID</label>
+        <input id="message-id" name="message-id" required />
+        <button type="submit">Read message</button>
+      </form>
       <p id="result" role="status">Ready</p>
     </main>
     <script type="module" src="/src/main.ts"></script>
