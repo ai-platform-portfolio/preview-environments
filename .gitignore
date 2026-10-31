@@ -4,3 +4,4 @@ frontend/playwright-report/
 frontend/test-results/
 backend/__pycache__/
 .venv/
+.env
