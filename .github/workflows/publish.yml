@@ -114,7 +114,7 @@ jobs:
       contents: read
       id-token: write
 
-    uses: ai-platform-portfolio/ops-shared/.github/workflows/docker.yml@f171a58467a1200584acc0d7c156a4e57e830a5a
+    uses: ai-platform-portfolio/ops-shared/.github/workflows/docker.yml@7ed775ef5c3077a99f49e859816ffc095c54d18a
     with:
       image: portfolio/preview-frontend
       context: frontend
@@ -132,7 +132,7 @@ jobs:
       contents: read
       id-token: write
 
-    uses: ai-platform-portfolio/ops-shared/.github/workflows/docker.yml@f171a58467a1200584acc0d7c156a4e57e830a5a
+    uses: ai-platform-portfolio/ops-shared/.github/workflows/docker.yml@7ed775ef5c3077a99f49e859816ffc095c54d18a
     with:
       image: portfolio/preview-backend
       context: backend
