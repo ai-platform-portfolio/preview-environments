@@ -95,8 +95,9 @@ docker compose run --rm migrate migrate status --env local --revisions-schema at
 `.github/workflows/publish.yml` runs on PR updates, main pushes and manual runs.
 It does not deploy anything. This caller owns its job graph and combined artifact
 record: Docker builds use the existing shared template, while Atlas setup/tests/
-publication use official actions. Checksum/replay validation is a standalone step;
-the equivalent small shared validation action is pending its reviewed merged pin.
+publication use official actions. Checksum/replay validation calls the small shared action at merged commit
+`7b7b2c3ab2552e5dc2fb7e954a090a63054981a4`. This credential-free replay runs
+before the bot-token preflight; Pro tests and publication still require the bot.
 Both images call the merged `ops-shared` workflow
 at an immutable commit pin and explicitly select one source SHA: the PR head or
 the push/manual event commit. Their tags are `preview-pr-N-SHA` on PRs and
