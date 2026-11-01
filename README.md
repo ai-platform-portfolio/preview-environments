@@ -90,6 +90,91 @@ docker compose run --rm migrate migrate apply --env local --revisions-schema atl
 docker compose run --rm migrate migrate status --env local --revisions-schema atlas
 ```
 
+## Artifact publication
+
+`.github/workflows/publish.yml` runs on PR updates, main pushes and manual runs.
+It does not deploy anything. This caller owns its job graph and combined artifact
+record: Docker builds use the existing shared template, while Atlas setup/tests/
+publication use official actions. Checksum/replay validation calls the small shared action at merged commit
+`7b7b2c3ab2552e5dc2fb7e954a090a63054981a4`. This credential-free replay runs
+before the bot-token preflight; Pro tests and publication still require the bot.
+Both images call the shared `ops-shared` workflow
+at an immutable commit pin and explicitly select one source SHA: the PR head or
+the push/manual event commit. Their tags are `preview-pr-N-SHA` on PRs and
+`commit-SHA` otherwise. Publishing is limited to same-repository PRs and main.
+Fork PRs and manual runs on other branches build images without publishing;
+they replay migrations without an Atlas login and skip Pro lint/tests.
+
+Publishing requires these GitHub Actions secrets, via existing organization
+secret access or repository configuration:
+
+- `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`: the existing
+  organization secrets for native Azure OIDC login. The image jobs request
+  `id-token: write`; the identity needs matching GitHub federated trust and push
+  access to `localacrk8s`. No JSON credential or client secret is required.
+- `ATLAS_CLOUD_TOKEN`: an Atlas CI bot for `ai-platform-portfolio`, with permission
+  to publish to the `preview-environments` migration repository. The first push
+  creates that repository. A local user's Atlas login does not configure CI.
+
+Same-repository PR authors must be trusted with those publishing credentials.
+No production database credentials are provided to CI. `atlas.ci.hcl` pins the
+Atlas organization and describes a disposable PostgreSQL 18.6 dev database;
+the separate file keeps local Compose usable without a Cloud login. CI validates
+the migration checksum/replay, lints changes relative to the event's Git base,
+and runs native migration tests before publishing. Git comparison works before
+the first main Registry baseline exists. Atlas CLI is pinned to 1.3.6 and actions
+are pinned to commits.
+
+The native Atlas push action publishes the migration directory under the same
+full source SHA. PR pushes set `latest: false`; main pushes also advance the
+Registry's `latest` baseline. Deployment must use
+`atlas://preview-environments?tag=<full-source-SHA>`, never `latest`. Tagged-only
+pushes do not upload the expected schema state used by Registry drift checks;
+preview drift acceptance therefore still needs an explicitly configured dev
+database and live operator testing. Image digests are immutable identities;
+commit-named migration tags plus `atlas.sum` identify migration content. This
+workflow does not configure Registry retention or server-enforced tag locking.
+
+After all publishers succeed, `artifacts.json` records repository/source SHA,
+workflow run/attempt, both image tags and digest references, and the migration
+repository/tag/URL/checksum. It is uploaded as an Actions artifact named
+`artifacts-SHA-runId-attempt`, retained for seven days. The record is refused if
+revisions disagree, a digest is missing, or the migration checksum changed.
+Partial publications can remain when another publisher fails; they produce no
+complete record. No deployment selector is updated in this PR.
+
+The workflow checks current open PR head (or current main head) before starting,
+then rechecks after publishers finish. PR concurrency cancels superseded runs.
+These checks cannot make GitHub head changes and artifact upload atomic. Future
+consumers must require a successful run and compare the record's SHA with the
+current PR head immediately before deployment or reporting a merge check.
+Seven-day Actions record retention is separate from ACR/Atlas artifact retention.
+
+Run the focused handoff checks locally with Python's standard library and `jq`:
+
+```sh
+python3 -m unittest discover -s tests -p 'test_publication.py' -v
+```
+
+### Fintech and proprietary-information boundary
+
+This public portfolio deliberately uses hosted Atlas Registry: `migrate push`
+uploads the migration SQL and schema information to Atlas. That is not an offline
+or company-boundary deployment. CI licensing also involves identified usage and
+error reporting; disabling anonymous telemetry is not a zero-egress guarantee.
+[Atlas data collection documentation](https://atlasgo.io/cli/data-privacy).
+
+For a fintech employer that prohibits customer or proprietary information leaving
+its approved boundary, recommend assessing Atlas Enterprise's **custom offline
+CI licence**, with migrations/plans stored in internal artifacts and operator
+ConfigMaps instead of hosted Registry, and internally operated CI where required.
+Confirm the licence and supported CLI/operator versions with Atlas, remove Cloud
+reporting/Registry dependencies, restrict egress, and verify network behavior
+before claiming zero vendor egress. An Enterprise licence alone does not redirect
+`migrate push` to internal storage. This is an alternative employer deployment
+recommendation, not a capability implemented or licensed by this portfolio.
+[Atlas offline licensing guidance](https://atlasgo.io/faq/atlas-without-cloud).
+
 ## Database requirements and ownership
 
 The migration is environment-independent SQL: one `public.messages` table with a
