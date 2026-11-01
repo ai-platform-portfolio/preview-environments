@@ -16,6 +16,7 @@ components:
 
 databases:
   messages:
+    reclaimPolicy: delete
     migration:
       repository: preview-environments
       tag: a429264bbc5960e7eacba1499e255f517a39ff48
