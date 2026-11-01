@@ -5,18 +5,16 @@ browser checks and delivery. It runs locally with Docker Compose and publishes
 matching immutable images/migration artifacts. Kubernetes acceptance wiring is
 prepared; no application deployment to AKS has been proved.
 
-[deploy/values.yaml](deploy/values.yaml) owns the application chart values for the
-manual acceptance caller: components, selected artifacts, database requests and
-access migrations. It contains no passwords. The hostname is an example; GitOps
-supplies the environment binding. The values deliberately select the verified
-artifact set from source `a429264`, independently of this deployment-config commit.
+[deploy/values.yaml](deploy/values.yaml) is the only deployment configuration:
+name/hostname, components/images and a database migration reference. The reusable
+[application chart](https://github.com/ai-platform-portfolio/application-helm-chart)
+owns the Argo template, resource defaults, database roles, credentials, RBAC, TLS
+and ordering. The API's health/readiness paths are app-specific inputs.
 
-[deploy/application.yaml](deploy/application.yaml) owns the Argo registration and
-environment binding. [deploy/credentials.yaml](deploy/credentials.yaml) supplies
-credential settings to the reusable application chart. GitOps contains shared
-platform packages only; no application registration or application values live there.
-Registration/sync requires separate deployment approval. Automatic PR lifecycle and
-deployed Testkube checks remain later work.
+The platform operator renders the chart's Argo template for registration; there
+are no Kubernetes manifests or credential plumbing here. GitOps is strictly shared
+packages. The values select the verified artifact set from source `a429264`;
+registration/sync and live acceptance still require separate approval.
 
 ## Run locally
 
