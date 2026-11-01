@@ -1,9 +1,21 @@
 # Preview environments proof of concept
 
 A small TypeScript frontend and Python API for exercising database migrations,
-browser checks and delivery. This PR runs locally with Docker Compose. Kubernetes
-delivery, artifact publication, preview lifecycle and deployed Testkube checks are
-separate work; this repository does not yet deploy the application to AKS.
+browser checks and delivery. It runs locally with Docker Compose and publishes
+matching immutable images/migration artifacts. Kubernetes acceptance wiring is
+prepared; no application deployment to AKS has been proved.
+
+[deploy/values.yaml](deploy/values.yaml) owns the application chart values for the
+manual acceptance caller: components, selected artifacts, database requests and
+access migrations. It contains no passwords. The hostname is an example; GitOps
+supplies the environment binding. The values deliberately select the verified
+artifact set from source `a429264`, independently of this deployment-config commit.
+
+The [GitOps registration](https://github.com/ai-platform-portfolio/gitops/tree/main/applications/preview-manual)
+pins the reusable chart and this values revision, supplies the hostname, and owns
+trusted credential/RBAC manifests. It lives outside the platform Helm chart and
+requires separate registration/sync approval. Automatic PR lifecycle and deployed
+Testkube checks remain later work.
 
 ## Run locally
 
