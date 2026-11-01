@@ -1,0 +1,22 @@
+# Matching images/migrations from main publication run41315554435.
+name: preview-poc
+hostname: preview-poc.dev.michaelalinks.com
+
+components:
+  web:
+    image: localacrk8s.azurecr.io/portfolio/preview-frontend@sha256:b6207b616980a63f8feecaaa0a1805b7d5a31f1af9155abcffaa45c1ffdf53ef
+    port: 8080
+
+  api:
+    image: localacrk8s.azurecr.io/portfolio/preview-backend@sha256:9bdd7282972d9984fb9cb9a6c53f0841783427cba4bf078aa93b372f9f76fddc
+    port: 8000
+    healthPath: /api/healthz
+    readinessPath: /api/readyz
+    database: messages
+
+databases:
+  messages:
+    reclaimPolicy: delete
+    migration:
+      repository: preview-environments
+      tag: a429264bbc5960e7eacba1499e255f517a39ff48

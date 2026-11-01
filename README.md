@@ -1,9 +1,20 @@
 # Preview environments proof of concept
 
 A small TypeScript frontend and Python API for exercising database migrations,
-browser checks and delivery. This PR runs locally with Docker Compose. Kubernetes
-delivery, artifact publication, preview lifecycle and deployed Testkube checks are
-separate work; this repository does not yet deploy the application to AKS.
+browser checks and delivery. It runs locally with Docker Compose and publishes
+matching immutable images/migration artifacts. Kubernetes acceptance wiring is
+prepared; no application deployment to AKS has been proved.
+
+[deploy/values.yaml](deploy/values.yaml) is the only deployment configuration:
+name/hostname, components/images and a database migration reference. The reusable
+[application chart](https://github.com/ai-platform-portfolio/application-helm-chart)
+owns the Argo template, resource defaults, database roles, credentials, RBAC, TLS
+and ordering. The API's health/readiness paths are app-specific inputs.
+
+The platform operator renders the chart's Argo template for registration; there
+are no Kubernetes manifests or credential plumbing here. GitOps is strictly shared
+packages. The values select the verified artifact set from source `a429264`;
+registration/sync and live acceptance still require separate approval.
 
 ## Run locally
 
