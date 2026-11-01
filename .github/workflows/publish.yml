@@ -110,7 +110,11 @@ jobs:
 
   frontend:
     needs: [source, validate]
-    uses: ai-platform-portfolio/ops-shared/.github/workflows/docker.yml@6cbc14849c4d2215ed850c421f5eee57d2535626
+    permissions:
+      contents: read
+      id-token: write
+
+    uses: ai-platform-portfolio/ops-shared/.github/workflows/docker.yml@f171a58467a1200584acc0d7c156a4e57e830a5a
     with:
       image: portfolio/preview-frontend
       context: frontend
@@ -118,11 +122,17 @@ jobs:
       tag: ${{ needs.source.outputs.tag }}
       publish-preview: true
     secrets:
-      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
   backend:
     needs: [source, validate]
-    uses: ai-platform-portfolio/ops-shared/.github/workflows/docker.yml@6cbc14849c4d2215ed850c421f5eee57d2535626
+    permissions:
+      contents: read
+      id-token: write
+
+    uses: ai-platform-portfolio/ops-shared/.github/workflows/docker.yml@f171a58467a1200584acc0d7c156a4e57e830a5a
     with:
       image: portfolio/preview-backend
       context: backend
@@ -130,7 +140,9 @@ jobs:
       tag: ${{ needs.source.outputs.tag }}
       publish-preview: true
     secrets:
-      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
   migrations:
     needs: [source, validate]

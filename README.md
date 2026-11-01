@@ -98,7 +98,7 @@ record: Docker builds use the existing shared template, while Atlas setup/tests/
 publication use official actions. Checksum/replay validation calls the small shared action at merged commit
 `7b7b2c3ab2552e5dc2fb7e954a090a63054981a4`. This credential-free replay runs
 before the bot-token preflight; Pro tests and publication still require the bot.
-Both images call the merged `ops-shared` workflow
+Both images call the shared `ops-shared` workflow
 at an immutable commit pin and explicitly select one source SHA: the PR head or
 the push/manual event commit. Their tags are `preview-pr-N-SHA` on PRs and
 `commit-SHA` otherwise. Publishing is limited to same-repository PRs and main.
@@ -108,8 +108,10 @@ they replay migrations without an Atlas login and skip Pro lint/tests.
 Publishing requires these GitHub Actions secrets, via existing organization
 secret access or repository configuration:
 
-- `AZURE_CREDENTIALS`: the existing service principal JSON with push access to
-  `localacrk8s`. Grant this repository access to the existing credential.
+- `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`: the existing
+  organization secrets for native Azure OIDC login. The image jobs request
+  `id-token: write`; the identity needs matching GitHub federated trust and push
+  access to `localacrk8s`. No JSON credential or client secret is required.
 - `ATLAS_CLOUD_TOKEN`: an Atlas CI bot for `ai-platform-portfolio`, with permission
   to publish to the `preview-environments` migration repository. The first push
   creates that repository. A local user's Atlas login does not configure CI.
