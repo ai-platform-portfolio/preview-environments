@@ -11,11 +11,12 @@ access migrations. It contains no passwords. The hostname is an example; GitOps
 supplies the environment binding. The values deliberately select the verified
 artifact set from source `a429264`, independently of this deployment-config commit.
 
-The [GitOps registration](https://github.com/ai-platform-portfolio/gitops/tree/main/applications/preview-manual)
-pins the reusable chart and this values revision, supplies the hostname, and owns
-trusted credential/RBAC manifests. It lives outside the platform Helm chart and
-requires separate registration/sync approval. Automatic PR lifecycle and deployed
-Testkube checks remain later work.
+[deploy/application.yaml](deploy/application.yaml) owns the Argo registration and
+environment binding. [deploy/credentials.yaml](deploy/credentials.yaml) supplies
+credential settings to the reusable application chart. GitOps contains shared
+platform packages only; no application registration or application values live there.
+Registration/sync requires separate deployment approval. Automatic PR lifecycle and
+deployed Testkube checks remain later work.
 
 ## Run locally
 
