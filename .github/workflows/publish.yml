@@ -1,0 +1,206 @@
+name: Publish application artifacts
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: artifacts-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  ATLAS_NO_ANON_TELEMETRY: 'true'
+  ATLAS_NO_UPDATE_NOTIFIER: 'true'
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    outputs:
+      revision: ${{ steps.source.outputs.revision }}
+      tag: ${{ steps.source.outputs.tag }}
+      publish: ${{ steps.source.outputs.publish }}
+
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      GH_TOKEN: ${{ github.token }}
+      PUBLISH: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')) }}
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+
+      - run: ./scripts/check-publication-source.sh
+
+      - name: Select artifact revision and tag
+        id: source
+        shell: bash
+        run: |
+          tag=commit-$SOURCE_SHA
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            tag=preview-pr-$PR_NUMBER-$SOURCE_SHA
+          fi
+
+          echo "revision=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "publish=$PUBLISH" >> "$GITHUB_OUTPUT"
+
+  validate:
+    needs: source
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ needs.source.outputs.revision }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Test artifact handoff guards
+        run: python3 -m unittest discover -s tests -p 'test_publication.py' -v
+
+      - name: Require Atlas CI bot for publishing
+        if: needs.source.outputs.publish == 'true'
+        env:
+          ATLAS_CLOUD_TOKEN: ${{ secrets.ATLAS_CLOUD_TOKEN }}
+        shell: bash
+        run: |
+          if [[ -z "$ATLAS_CLOUD_TOKEN" ]]; then
+            echo '::error::ATLAS_CLOUD_TOKEN must be available to this repository for Atlas validation and publication.'
+            exit 1
+          fi
+
+      - uses: ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea
+        with:
+          version: v1.3.6
+          cloud-token: ${{ needs.source.outputs.publish == 'true' && secrets.ATLAS_CLOUD_TOKEN || '' }}
+
+      - name: Validate migration checksum and replay
+        run: atlas migrate validate --env local --dev-url 'docker://postgres/18.6/dev?search_path=public'
+
+      - name: Lint and test migrations
+        if: needs.source.outputs.publish == 'true'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+        shell: bash
+        run: |
+          # Git comparison also works before the first main Registry baseline exists.
+          atlas migrate lint --config file://atlas.ci.hcl --env ci --git-base "$BASE_SHA"
+          atlas migrate test --config file://atlas.ci.hcl --env ci
+
+  frontend:
+    needs: [source, validate]
+    uses: ai-platform-portfolio/ops-shared/.github/workflows/docker.yml@6cbc14849c4d2215ed850c421f5eee57d2535626
+    with:
+      image: portfolio/preview-frontend
+      context: frontend
+      revision: ${{ needs.source.outputs.revision }}
+      tag: ${{ needs.source.outputs.tag }}
+      publish-preview: true
+    secrets:
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+
+  backend:
+    needs: [source, validate]
+    uses: ai-platform-portfolio/ops-shared/.github/workflows/docker.yml@6cbc14849c4d2215ed850c421f5eee57d2535626
+    with:
+      image: portfolio/preview-backend
+      context: backend
+      revision: ${{ needs.source.outputs.revision }}
+      tag: ${{ needs.source.outputs.tag }}
+      publish-preview: true
+    secrets:
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+
+  migrations:
+    needs: [source, validate]
+    if: needs.source.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    outputs:
+      revision: ${{ steps.record.outputs.revision }}
+      checksum: ${{ steps.record.outputs.checksum }}
+
+    env:
+      SOURCE_SHA: ${{ needs.source.outputs.revision }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+
+      - run: ./scripts/check-publication-source.sh
+
+      - uses: ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea
+        with:
+          version: v1.3.6
+          cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
+
+      - name: Publish the matching migration directory
+        uses: ariga/atlas-action/migrate/push@be526fa360e6cb745546681470f4760dbbc49cf8
+        with:
+          config: file://atlas.ci.hcl
+          env: ci
+          dir-name: preview-environments
+          tag: ${{ env.SOURCE_SHA }}
+          latest: ${{ github.event_name != 'pull_request' }}
+
+      - name: Record published migration identity
+        id: record
+        shell: bash
+        run: |
+          git diff --exit-code -- migrations
+          echo "revision=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          echo "checksum=$(shasum -a 256 migrations/atlas.sum | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+
+  artifacts:
+    needs: [source, frontend, backend, migrations]
+    if: needs.source.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      SOURCE_SHA: ${{ needs.source.outputs.revision }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      GH_TOKEN: ${{ github.token }}
+      FRONTEND_IMAGE: ${{ needs.frontend.outputs.image }}
+      FRONTEND_DIGEST: ${{ needs.frontend.outputs.digest }}
+      FRONTEND_REVISION: ${{ needs.frontend.outputs.revision }}
+      BACKEND_IMAGE: ${{ needs.backend.outputs.image }}
+      BACKEND_DIGEST: ${{ needs.backend.outputs.digest }}
+      BACKEND_REVISION: ${{ needs.backend.outputs.revision }}
+      MIGRATION_REVISION: ${{ needs.migrations.outputs.revision }}
+      MIGRATION_CHECKSUM: ${{ needs.migrations.outputs.checksum }}
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+
+      - run: ./scripts/write-artifact-record.sh
+
+      # Recheck after every publisher completes; a stale run gets no complete record.
+      - run: ./scripts/check-publication-source.sh
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: artifacts-${{ env.SOURCE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts.json
+          if-no-files-found: error
+          retention-days: 7
