@@ -93,7 +93,11 @@ docker compose run --rm migrate migrate status --env local --revisions-schema at
 ## Artifact publication
 
 `.github/workflows/publish.yml` runs on PR updates, main pushes and manual runs.
-It does not deploy anything. Both images call the merged `ops-shared` workflow
+It does not deploy anything. This caller owns its job graph and combined artifact
+record: Docker builds use the existing shared template, while Atlas setup/tests/
+publication use official actions. Checksum/replay validation is a standalone step;
+the equivalent small shared validation action is pending its reviewed merged pin.
+Both images call the merged `ops-shared` workflow
 at an immutable commit pin and explicitly select one source SHA: the PR head or
 the push/manual event commit. Their tags are `preview-pr-N-SHA` on PRs and
 `commit-SHA` otherwise. Publishing is limited to same-repository PRs and main.
