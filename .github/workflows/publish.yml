@@ -17,6 +17,7 @@ concurrency:
 env:
   ATLAS_NO_ANON_TELEMETRY: 'true'
   ATLAS_NO_UPDATE_NOTIFIER: 'true'
+  APPLICATION_CHART_REVISION: a200d40d3492155b2122ee81be4685ebf4fba79a
 
 jobs:
   source:
@@ -67,7 +68,23 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Test artifact handoff guards
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ai-platform-portfolio/application-helm-chart
+          ref: ${{ env.APPLICATION_CHART_REVISION }}
+          path: .application-chart
+          persist-credentials: false
+
+      - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
+        with:
+          version: v3.22.1
+
+      # Same YAML parser as the existing platform validation tooling.
+      - run: python3 -m pip install PyYAML==6.0.3
+
+      - name: Test artifact and release handoff guards
+        env:
+          APPLICATION_CHART: .application-chart
         run: python3 -m unittest discover -s tests -p 'test_publication.py' -v
 
       - uses: ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea
@@ -193,7 +210,12 @@ jobs:
     needs: [source, frontend, backend, migrations]
     if: needs.source.outputs.publish == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write
 
     env:
       SOURCE_SHA: ${{ needs.source.outputs.revision }}
@@ -216,7 +238,67 @@ jobs:
 
       - run: ./scripts/write-artifact-record.sh
 
-      # Recheck after every publisher completes; a stale run gets no complete record.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ai-platform-portfolio/application-helm-chart
+          ref: ${{ env.APPLICATION_CHART_REVISION }}
+          path: .application-chart
+          persist-credentials: false
+
+      - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
+        with:
+          version: v3.22.1
+
+      - run: python3 -m pip install PyYAML==6.0.3
+
+      - name: Generate complete release values
+        id: values
+        run: python3 scripts/write-release-values.py
+
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log Helm in to ACR
+        shell: bash
+        run: |
+          set -euo pipefail
+          az acr login --name localacrk8s --expose-token --query accessToken -o tsv |
+            helm registry login localacrk8s.azurecr.io \
+              --username 00000000-0000-0000-0000-000000000000 --password-stdin
+
+      # Recheck immediately before publication and again before handing it off.
+      - run: ./scripts/check-publication-source.sh
+
+      - name: Publish complete Helm release
+        id: release
+        uses: ai-platform-portfolio/ops-shared/.github/actions/publish-release@086656e99c147d927b14bc342afef826c5483f66
+        with:
+          chart: .application-chart
+          values: ${{ steps.values.outputs.values }}
+          destination: ${{ steps.values.outputs.destination }}
+          version: ${{ steps.values.outputs.version }}
+          revision: ${{ env.SOURCE_SHA }}
+
+      - name: Lock release tag and record published identity
+        env:
+          RELEASE_REFERENCE: ${{ steps.release.outputs.reference }}
+          RELEASE_DIGEST: ${{ steps.release.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          az acr repository update --name localacrk8s \
+            --image "${RELEASE_REFERENCE#localacrk8s.azurecr.io/}" \
+            --write-enabled false --output none
+
+          jq --arg reference "$RELEASE_REFERENCE" --arg digest "$RELEASE_DIGEST" \
+            --arg chart "$APPLICATION_CHART_REVISION" \
+            '.release = {reference: $reference, digest: $digest, chartRevision: $chart}' \
+            artifacts.json > "$RUNNER_TEMP/artifacts.json"
+          mv "$RUNNER_TEMP/artifacts.json" artifacts.json
+
       - run: ./scripts/check-publication-source.sh
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
