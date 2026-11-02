@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 test('message survives a page reload through the frontend, API and database', async ({ page }) => {
   const text = `Browser persistence check ${randomUUID()}`;
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Preview environment' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Preview message board' })).toBeVisible();
   await page.getByLabel('Message', { exact: true }).fill(text);
   await page.getByRole('button', { name: 'Save message' }).click();
   await expect(page.getByRole('status')).toHaveText(text);
