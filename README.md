@@ -2,8 +2,8 @@
 
 A small TypeScript frontend and Python API for exercising database migrations,
 browser checks and delivery. It runs locally with Docker Compose and publishes
-matching immutable images/migration artifacts. Kubernetes acceptance wiring is
-prepared; no application deployment to AKS has been proved.
+matching immutable images/migration artifacts. Manual Kubernetes deployment and HTTPS browser persistence have been proved;
+automatic PR environments and deployed required merge checks remain unfinished.
 
 [deploy/values.yaml](deploy/values.yaml) is the only deployment configuration:
 name/hostname, components/images and a database migration reference. The reusable
@@ -14,7 +14,8 @@ and ordering. The API's health/readiness paths are app-specific inputs.
 The platform operator renders the chart's Argo template for registration; there
 are no Kubernetes manifests or credential plumbing here. GitOps is strictly shared
 packages. The values select the verified artifact set from source `a429264`;
-registration/sync and live acceptance still require separate approval.
+this remains the manual baseline. CI generates separate release values without
+editing this file. Cluster changes still require separate approval.
 
 ## Run locally
 
@@ -120,7 +121,7 @@ Publishing requires these GitHub Actions secrets, via existing organization
 secret access or repository configuration:
 
 - `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`: the existing
-  organization secrets for native Azure OIDC login. The image jobs request
+  organization secrets for native Azure OIDC login. The image and release jobs request
   `id-token: write`; the identity needs matching GitHub federated trust and push
   access to `localacrk8s`. No JSON credential or client secret is required.
 - `ATLAS_CLOUD_TOKEN`: an Atlas CI bot for `ai-platform-portfolio`, with permission
@@ -152,20 +153,63 @@ repository/tag/URL/checksum. It is uploaded as an Actions artifact named
 `artifacts-SHA-runId-attempt`, retained for seven days. The record is refused if
 revisions disagree, a digest is missing, or the migration checksum changed.
 Partial publications can remain when another publisher fails; they produce no
-complete record. No deployment selector is updated in this PR.
+complete record or Helm package. No deployment selector is updated here.
 
-The workflow checks current open PR head (or current main head) before starting,
-then rechecks after publishers finish. PR concurrency cancels superseded runs.
-These checks cannot make GitHub head changes and artifact upload atomic. Future
-consumers must require a successful run and compare the record's SHA with the
-current PR head immediately before deployment or reporting a merge check.
+The final job composes shared `acr-helm-login`, `publish-release` and `acr-lock`
+actions. Azure authentication and registry locking live in `ops-shared`; the caller
+owns its dependencies, source guards and artifact mapping. The ACR actions are pinned
+at `1b56a382304c60e4bcfea11bb7bc6f789a14e8b2`; `publish-release` is pinned at
+`086656e99c147d927b14bc342afef826c5483f66`. It packages the central application
+chart pinned at `a200d40d3492155b2122ee81be4685ebf4fba79a`, unchanged, alongside
+`release-values.yaml`. This generated file preserves app-specific ports, probes
+and database intent while replacing image references with both published digests
+and selecting the matching migration SHA. The chart's `appVersion` is the source
+SHA. The package contains chart templates and values, not container image layers.
+
+Release destinations are derived from GitHub identity:
+
+- PR: `localacrk8s.azurecr.io/releases/<owner>/<repository>/pr-<number>/application`.
+- Main: `localacrk8s.azurecr.io/releases/<owner>/<repository>/main/application`.
+
+Generated Kubernetes names include the repository slug, a hash of the full
+owner/repository, and PR number (or `main`). The hostname uses that generated name
+under the existing deployment hostname's domain. No shared repository edit or
+manual preview-name input is needed. Actual deployment and wildcard HTTPS support
+belong to the subsequent central ApplicationSet/chart work.
+
+Versions are `0.<workflow-run-number>.<attempt>-g<full-source-SHA>`: newer runs sort
+ahead of retried older runs, even when the older run finishes later. A retry gets
+a new version. A future floating preview selector must include prereleases (for
+example `*-0`); persistent environments must pin a release. CI disables writes to
+the published ACR tag before recording its reference, digest and central-chart
+revision in `artifacts.json`. Locking uses the existing Azure identity; registry
+push alone does not prove attribute-update permission. This requires a live CI
+run. Locked tags require deliberate unlocking for eventual retention cleanup;
+keep packages available until dependent preview cleanup finishes.
+[ACR locking documentation](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-image-lock).
+
+The workflow checks the current open PR head and same-repository trust (or current
+main head) before starting, immediately before the Helm push, and before handing
+off the record. Forks and non-main manual runs retain build-only behavior. PR
+concurrency cancels superseded runs. GitHub head changes, registry writes, tag
+locking and record upload are not atomic: a cancelled, failed or superseded run
+can leave a package without a successful handoff. Consumers must check the
+successful publication run AND compare the packaged source SHA with the current
+PR head before deployment or reporting a merge check; a floating version alone is
+insufficient. That consumer gate and the first private Argo pull are still pending.
 Seven-day Actions record retention is separate from ACR/Atlas artifact retention.
 
-Run the focused handoff checks locally with Python's standard library and `jq`:
+Run the focused handoff checks with Python, PyYAML (also used by platform
+validation), `jq`, Helm and the pinned chart checkout:
 
 ```sh
-python3 -m unittest discover -s tests -p 'test_publication.py' -v
+python3 -m pip install PyYAML==6.0.3
+APPLICATION_CHART=../application-helm-chart python3 -m unittest discover -s tests -p 'test_publication.py' -v
 ```
+
+Tests cover source/trust guards, complete artifact mapping, cross-repository/PR
+isolation, version ordering, and a real central-chart package/extract/render.
+Only the GitHub API is faked; these local tests do not write to a registry.
 
 ### Fintech and proprietary-information boundary
 
