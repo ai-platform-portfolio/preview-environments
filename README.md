@@ -155,7 +155,10 @@ revisions disagree, a digest is missing, or the migration checksum changed.
 Partial publications can remain when another publisher fails; they produce no
 complete record or Helm package. No deployment selector is updated here.
 
-The final job calls the shared `publish-release` action pinned at
+The final job composes shared `acr-helm-login`, `publish-release` and `acr-lock`
+actions. Azure authentication and registry locking live in `ops-shared`; the caller
+owns its dependencies, source guards and artifact mapping. The ACR actions are pinned
+at `1b56a382304c60e4bcfea11bb7bc6f789a14e8b2`; `publish-release` is pinned at
 `086656e99c147d927b14bc342afef826c5483f66`. It packages the central application
 chart pinned at `a200d40d3492155b2122ee81be4685ebf4fba79a`, unchanged, alongside
 `release-values.yaml`. This generated file preserves app-specific ports, probes

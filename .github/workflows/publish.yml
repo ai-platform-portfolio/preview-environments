@@ -255,19 +255,12 @@ jobs:
         id: values
         run: python3 scripts/write-release-values.py
 
-      - uses: azure/login@v3
+      - uses: ai-platform-portfolio/ops-shared/.github/actions/acr-helm-login@1b56a382304c60e4bcfea11bb7bc6f789a14e8b2
         with:
+          registry: localacrk8s
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Log Helm in to ACR
-        shell: bash
-        run: |
-          set -euo pipefail
-          az acr login --name localacrk8s --expose-token --query accessToken -o tsv |
-            helm registry login localacrk8s.azurecr.io \
-              --username 00000000-0000-0000-0000-000000000000 --password-stdin
 
       # Recheck immediately before publication and again before handing it off.
       - run: ./scripts/check-publication-source.sh
@@ -282,17 +275,18 @@ jobs:
           version: ${{ steps.values.outputs.version }}
           revision: ${{ env.SOURCE_SHA }}
 
-      - name: Lock release tag and record published identity
+      - uses: ai-platform-portfolio/ops-shared/.github/actions/acr-lock@1b56a382304c60e4bcfea11bb7bc6f789a14e8b2
+        with:
+          registry: localacrk8s
+          reference: ${{ steps.release.outputs.reference }}
+
+      - name: Record published release identity
         env:
           RELEASE_REFERENCE: ${{ steps.release.outputs.reference }}
           RELEASE_DIGEST: ${{ steps.release.outputs.digest }}
         shell: bash
         run: |
           set -euo pipefail
-          az acr repository update --name localacrk8s \
-            --image "${RELEASE_REFERENCE#localacrk8s.azurecr.io/}" \
-            --write-enabled false --output none
-
           jq --arg reference "$RELEASE_REFERENCE" --arg digest "$RELEASE_DIGEST" \
             --arg chart "$APPLICATION_CHART_REVISION" \
             '.release = {reference: $reference, digest: $digest, chartRevision: $chart}' \
