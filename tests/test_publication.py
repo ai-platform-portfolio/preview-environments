@@ -100,6 +100,8 @@ class PublicationTests(unittest.TestCase):
         self.assertTrue(values["hostname"].startswith(values["name"] + "."))
         self.assertEqual(outputs["destination"], "oci://localacrk8s.azurecr.io/releases/org/app/pr-42")
         self.assertEqual(outputs["version"], "0.12.2-g" + self.sha)
+        self.assertEqual(values["platform"]["atlas"]["rolePlanRepository"], outputs["role-repository"])
+        self.assertTrue(outputs["role-repository"].endswith("-roles"))
         self.assertEqual(yaml.safe_load((self.repo / "deploy/values.yaml").read_text()), base)
 
     def test_release_isolation_and_ordering(self):
@@ -109,6 +111,11 @@ class PublicationTests(unittest.TestCase):
         main, fourth = self.release(GITHUB_EVENT_NAME="push", GITHUB_REF="refs/heads/main", PR_NUMBER="")
         self.assertEqual(len({v["name"] for v in (one, two, other, main)}), 4)
         self.assertEqual(len({v["destination"] for v in (first, second, third, fourth)}), 4)
+        self.assertEqual(first["role-repository"], second["role-repository"])
+        self.assertEqual(first["role-repository"], fourth["role-repository"])
+        self.assertNotEqual(first["role-repository"], third["role-repository"])
+        unusual, _ = self.release(GITHUB_REPOSITORY="org/___")
+        self.assertTrue(unusual["name"].startswith("app-"))
         _, newer = self.release(GITHUB_RUN_NUMBER="13", GITHUB_RUN_ATTEMPT="1")
         _, retry = self.release(GITHUB_RUN_NUMBER="12", GITHUB_RUN_ATTEMPT="3")
         key = lambda version: tuple(int(v) for v in version.split("-", 1)[0].split("."))
@@ -146,6 +153,8 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(before, after)
         resources = list(yaml.safe_load_all(after))
         self.assertTrue(any(v and v["kind"] == "AtlasMigration" for v in resources))
+        roles = next(v for v in resources if v and v["kind"] == "AtlasSchema")
+        self.assertEqual(roles["spec"]["cloud"]["repo"], values["platform"]["atlas"]["rolePlanRepository"])
         self.assertTrue(any(v and v["kind"] == "Deployment" for v in resources))
         self.assertTrue(all(not v or v.get("metadata", {}).get("name") != "preview-poc" for v in resources))
 
