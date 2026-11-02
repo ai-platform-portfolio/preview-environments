@@ -17,7 +17,7 @@ concurrency:
 env:
   ATLAS_NO_ANON_TELEMETRY: 'true'
   ATLAS_NO_UPDATE_NOTIFIER: 'true'
-  APPLICATION_CHART_REVISION: a200d40d3492155b2122ee81be4685ebf4fba79a
+  APPLICATION_CHART_REVISION: 0623f44ec2ea3ee45f2fd44c9054d33aad3f7d94 # 0.8.0
 
 jobs:
   source:
@@ -267,7 +267,7 @@ jobs:
 
       - name: Publish complete Helm release
         id: release
-        uses: ai-platform-portfolio/ops-shared/.github/actions/publish-release@086656e99c147d927b14bc342afef826c5483f66
+        uses: ai-platform-portfolio/ops-shared/.github/actions/publish-release@62b0185e9c21acadca8fe4250dbf64c262377a94
         with:
           chart: .application-chart
           values: ${{ steps.values.outputs.values }}
