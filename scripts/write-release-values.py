@@ -48,20 +48,23 @@ def write_release():
 
     # GitHub identity, rather than a manually maintained preview name, owns isolation.
     canonical = repository.lower()
-    slug = re.sub(r"[^a-z0-9]+", "-", canonical.split("/")[1]).strip("-")[:28]
+    slug = re.sub(r"[^a-z0-9]+", "-", canonical.split("/")[1]).strip("-")[:28].rstrip("-") or "app"
     suffix = hashlib.sha256(canonical.encode()).hexdigest()[:12]
     name = f"{slug}-{suffix}-{scope}"
     domain = values["hostname"].partition(".")[2]
     if not domain:
         raise ValueError("Application hostname must include its deployment domain")
     values.update(name=name, namespace=name, hostname=f"{name}.{domain}")
+    # Plan history belongs to the application repository, shared across its previews.
+    role_repository = f"{slug}-{suffix}-roles"
+    values.setdefault("platform", {}).setdefault("atlas", {})["rolePlanRepository"] = role_repository
 
     version = f"0.{run}.{attempt}-g{revision}"
     destination = f"oci://localacrk8s.azurecr.io/releases/{canonical}/{scope}"
     output = Path(os.environ["RUNNER_TEMP"]) / "release-values.yaml"
     output.write_text(yaml.safe_dump(values, sort_keys=False))
     with Path(os.environ["GITHUB_OUTPUT"]).open("a") as stream:
-        stream.write(f"values={output}\ndestination={destination}\nversion={version}\n")
+        stream.write(f"values={output}\ndestination={destination}\nversion={version}\nrole-repository={role_repository}\n")
 
 
 if __name__ == "__main__":

@@ -17,7 +17,7 @@ concurrency:
 env:
   ATLAS_NO_ANON_TELEMETRY: 'true'
   ATLAS_NO_UPDATE_NOTIFIER: 'true'
-  APPLICATION_CHART_REVISION: 0623f44ec2ea3ee45f2fd44c9054d33aad3f7d94 # 0.8.0
+  APPLICATION_CHART_REVISION: b3bd8e57b3976679201e1a61ee050e3e8d8e43f0 # 0.9.0
 
 jobs:
   source:
@@ -263,6 +263,20 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       # Recheck immediately before publication and again before handing it off.
+      - run: ./scripts/check-publication-source.sh
+
+      - uses: ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea
+        with:
+          version: v1.3.6
+          cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
+
+      - name: Ensure the application's shared role-plan repository
+        uses: ai-platform-portfolio/ops-shared/.github/actions/atlas-repository@41f6092ca6c9054a116da549406d3453eb0564e8
+        with:
+          name: ${{ steps.values.outputs.role-repository }}
+          type: schema
+          driver: postgres
+
       - run: ./scripts/check-publication-source.sh
 
       - name: Publish complete Helm release
