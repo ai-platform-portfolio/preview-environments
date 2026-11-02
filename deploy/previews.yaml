@@ -1,0 +1,5 @@
+platform:
+  argocd:
+    repository: https://github.com/ai-platform-portfolio/preview-environments.git
+    previews:
+      enabled: true
