@@ -101,6 +101,9 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(outputs["destination"], "oci://localacrk8s.azurecr.io/releases/org/app/pr-42")
         self.assertEqual(outputs["version"], "0.12.2-g" + self.sha)
         self.assertEqual(values["platform"]["atlas"]["rolePlanRepository"], outputs["role-repository"])
+        self.assertTrue(values["platform"]["tests"]["playwright"]["enabled"])
+        self.assertEqual(values["platform"]["release"]["expectedRevision"], self.sha)
+        self.assertEqual(values["platform"]["release"]["check"]["repository"], "org/app")
         self.assertTrue(outputs["role-repository"].endswith("-roles"))
         self.assertEqual(yaml.safe_load((self.repo / "deploy/values.yaml").read_text()), base)
 
@@ -114,6 +117,8 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(first["role-repository"], second["role-repository"])
         self.assertEqual(first["role-repository"], fourth["role-repository"])
         self.assertNotEqual(first["role-repository"], third["role-repository"])
+        self.assertEqual(main["platform"]["release"]["expectedRevision"], self.sha)
+        self.assertEqual(main["platform"]["release"]["check"]["repository"], "org/app")
         unusual, _ = self.release(GITHUB_REPOSITORY="org/___")
         self.assertTrue(unusual["name"].startswith("app-"))
         _, newer = self.release(GITHUB_RUN_NUMBER="13", GITHUB_RUN_ATTEMPT="1")
@@ -139,11 +144,14 @@ class PublicationTests(unittest.TestCase):
         values, _ = self.release()
         chart = Path(os.environ.get("APPLICATION_CHART", ROOT.parent / "application-helm-chart")).resolve()
         helm = os.environ.get("HELM_BIN", "helm")
-        before = subprocess.check_output([helm, "template", "preview", str(chart), "-f",
-                                          str(self.repo / "release-values.yaml")], text=True)
         package_dir = self.repo / "package"
         shutil.copytree(chart, package_dir, ignore=shutil.ignore_patterns(".git", ".github"))
+        metadata = yaml.safe_load((package_dir / "Chart.yaml").read_text())
+        metadata.update(version="0.12.2-g" + self.sha, appVersion=self.sha)
+        (package_dir / "Chart.yaml").write_text(yaml.safe_dump(metadata))
         shutil.copy(self.repo / "release-values.yaml", package_dir / "release-values.yaml")
+        before = subprocess.check_output([helm, "template", "preview", str(package_dir), "-f",
+                                          str(self.repo / "release-values.yaml")], text=True)
         subprocess.run([helm, "package", str(package_dir), "--destination", str(self.repo),
                         "--version", "0.12.2-g" + self.sha, "--app-version", self.sha], check=True, capture_output=True)
         package = next(self.repo.glob("application-*.tgz"))
@@ -156,6 +164,9 @@ class PublicationTests(unittest.TestCase):
         roles = next(v for v in resources if v and v["kind"] == "AtlasSchema")
         self.assertEqual(roles["spec"]["cloud"]["repo"], values["platform"]["atlas"]["rolePlanRepository"])
         self.assertTrue(any(v and v["kind"] == "Deployment" for v in resources))
+        browser = next(v for v in resources if v and v["kind"] == "TestWorkflow")
+        self.assertEqual(browser["spec"]["content"]["git"]["revision"], self.sha)
+        self.assertEqual(browser["spec"]["content"]["git"]["uri"], "https://github.com/org/app.git")
         self.assertTrue(all(not v or v.get("metadata", {}).get("name") != "preview-poc" for v in resources))
 
     def test_current_pr_and_main(self):

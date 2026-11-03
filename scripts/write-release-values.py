@@ -58,6 +58,9 @@ def write_release():
     # Plan history belongs to the application repository, shared across its previews.
     role_repository = f"{slug}-{suffix}-roles"
     values.setdefault("platform", {}).setdefault("atlas", {})["rolePlanRepository"] = role_repository
+    release = values["platform"].setdefault("release", {})
+    release["expectedRevision"] = revision
+    release.setdefault("check", {})["repository"] = canonical
 
     version = f"0.{run}.{attempt}-g{revision}"
     destination = f"oci://localacrk8s.azurecr.io/releases/{canonical}/{scope}"
