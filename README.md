@@ -2,14 +2,26 @@
 
 A small TypeScript frontend and Python API for exercising database migrations,
 browser checks and delivery. It runs locally with Docker Compose and publishes
-matching immutable images/migration artifacts. Manual Kubernetes deployment and HTTPS browser persistence have been proved;
-automatic PR environments and deployed required merge checks remain unfinished.
+matching immutable images/migration artifacts. Automatic PR environments and a
+deployed browser check have been proved for one merged PR. Persistent staging
+and production are the next delivery gate.
 
-[deploy/values.yaml](deploy/values.yaml) is the only deployment configuration:
+[deploy/values.yaml](deploy/values.yaml) holds application deployment intent:
 name/hostname, components/images and a database migration reference. The reusable
 [application chart](https://github.com/ai-platform-portfolio/application-helm-chart)
 owns the Argo template, resource defaults, database roles, credentials, RBAC, TLS
 and ordering. The API's health/readiness paths are app-specific inputs.
+
+[deploy/environments.yaml](deploy/environments.yaml) declares staging and
+production registration intent. The platform supplies Azure server, identity and
+Atlas settings when rendering the reusable chart's ApplicationSet template.
+After registration, each environment follows its own
+`deploy/environments/<name>.yaml` release pin on main. These pin files are created
+by the promotion workflow; they are intentionally absent until an immutable
+publication is selected. The workflow opens a PR for each pin change. Production
+requires the identical staging pin and a successful deployed staging browser
+status on the source commit. A rollback selects an earlier published release in
+the same way; it does not recreate the environment database.
 
 The platform operator renders the chart's Argo template for registration; there
 are no Kubernetes manifests or credential plumbing here. GitOps is strictly shared

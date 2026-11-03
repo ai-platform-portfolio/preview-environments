@@ -89,6 +89,24 @@ class PublicationTests(unittest.TestCase):
         outputs = dict(line.split("=", 1) for line in (self.repo / "outputs").read_text().splitlines())
         return yaml.safe_load((self.repo / "release-values.yaml").read_text()), outputs
 
+    def test_promotion_pins_one_published_release_and_requires_staging_first(self):
+        _, outputs = self.release()
+        record_path = self.repo / "artifacts.json"
+        record = json.loads(record_path.read_text())
+        record["release"] = {
+            "reference": outputs["destination"].removeprefix("oci://") + "/application:" + outputs["version"],
+            "digest": "sha256:" + "c" * 64,
+        }
+        record_path.write_text(json.dumps(record))
+        self.run_script("pin-environment.py", False, TARGET_ENVIRONMENT="production", PUBLICATION_RUN_ID="123")
+        self.run_script("pin-environment.py", TARGET_ENVIRONMENT="staging", PUBLICATION_RUN_ID="123")
+        self.run_script("pin-environment.py", TARGET_ENVIRONMENT="production", PUBLICATION_RUN_ID="123")
+        staging = yaml.safe_load((self.repo / "deploy/environments/staging.yaml").read_text())
+        production = yaml.safe_load((self.repo / "deploy/environments/production.yaml").read_text())
+        self.assertEqual(staging, production)
+        self.assertEqual(staging["release"]["sourceSha"], self.sha)
+        self.run_script("pin-environment.py", False, TARGET_ENVIRONMENT="staging", PUBLICATION_RUN_ID="124")
+
     def test_complete_values_preserve_app_intent_and_replace_artifact_pins(self):
         values, outputs = self.release()
         base = yaml.safe_load((ROOT / "deploy/values.yaml").read_text())
