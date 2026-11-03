@@ -1,0 +1,4 @@
+# Kargo creates the selected version on the delivery branch after staging verifies.
+environment: production
+release:
+  version: ""

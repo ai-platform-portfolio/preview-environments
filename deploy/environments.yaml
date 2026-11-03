@@ -6,4 +6,7 @@ platform:
       enabled: true
       targets:
         staging: {hostname: poc-staging.dev.michaelalinks.com}
-        production: {hostname: poc-production.dev.michaelalinks.com}
+        production: {hostname: poc-production.dev.michaelalinks.com, from: staging}
+
+  kargo:
+    enabled: true

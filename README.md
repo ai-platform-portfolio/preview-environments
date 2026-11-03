@@ -16,12 +16,12 @@ and ordering. The API's health/readiness paths are app-specific inputs.
 production registration intent. The platform supplies Azure server, identity and
 Atlas settings when rendering the reusable chart's ApplicationSet template.
 After registration, each environment follows its own
-`deploy/environments/<name>.yaml` release pin on main. These pin files are created
-by the promotion workflow; they are intentionally absent until an immutable
-publication is selected. The workflow opens a PR for each pin change. Production
-requires the identical staging pin and a successful deployed staging browser
-status on the source commit. A rollback selects an earlier published release in
-the same way; it does not recreate the environment database.
+`deploy/environments/<name>/release.yaml` pin on the `delivery` branch. The files
+on `main` show the environment layout but select no version. Kargo discovers
+the published main application chart, writes a selected version to the delivery
+branch, and waits for Argo to deploy it. Production accepts Freight verified in
+staging. Selecting an earlier Freight rolls back the application release without
+recreating its environment database.
 
 The platform operator renders the chart's Argo template for registration; there
 are no Kubernetes manifests or credential plumbing here. GitOps is strictly shared
