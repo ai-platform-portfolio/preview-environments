@@ -59,6 +59,7 @@ def healthz() -> dict[str, str]:
 
 @app.get("/api/readyz")
 def readyz() -> dict[str, str]:
+    # Readiness confirms the shared schema before a candidate can receive traffic.
     with connect() as connection:
         connection.execute("SELECT id, text, created_at FROM public.messages LIMIT 0")
     return {"status": "ready"}
