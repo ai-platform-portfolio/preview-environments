@@ -13,6 +13,7 @@ components:
     port: 8080
 
   api:
+    delivery: rollout
     image: localacrk8s.azurecr.io/portfolio/preview-backend@sha256:9bdd7282972d9984fb9cb9a6c53f0841783427cba4bf078aa93b372f9f76fddc
     port: 8000
     healthPath: /api/healthz
