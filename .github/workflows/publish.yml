@@ -17,7 +17,7 @@ concurrency:
 env:
   ATLAS_NO_ANON_TELEMETRY: 'true'
   ATLAS_NO_UPDATE_NOTIFIER: 'true'
-  APPLICATION_CHART_REVISION: 9a79e22844d9704c0be8f2d3e689f2332f6587aa # AI-154, 0.15.0
+  APPLICATION_CHART_REVISION: 2a3d4763402912567aee3c90a8e8219dc5c5fdaa # AI-157; repin to merged chart commit before merging
 
 jobs:
   source:
