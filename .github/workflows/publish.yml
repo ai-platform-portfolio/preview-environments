@@ -17,7 +17,7 @@ concurrency:
 env:
   ATLAS_NO_ANON_TELEMETRY: 'true'
   ATLAS_NO_UPDATE_NOTIFIER: 'true'
-  APPLICATION_CHART_REVISION: 22165c9d0f6df9f474e8ca88962641f388f29825 # AI-159, merged chart
+  APPLICATION_CHART_REVISION: c8b788f38abcbb78084cff26a9268ede8e3e6ff2 # AI-159/AI-160, merged chart
 
 jobs:
   source:
