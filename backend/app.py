@@ -54,6 +54,7 @@ def database_error(request, exc):
 
 @app.get("/api/healthz")
 def healthz() -> dict[str, str]:
+    # Keep liveness independent of the database readiness check.
     return {"status": "ok"}
 
 
