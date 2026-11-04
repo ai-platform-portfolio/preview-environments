@@ -1,0 +1,3 @@
+environment: production
+release:
+  version: "0.44.1-g7dea0f179c3dedbd41f34bce7cc030a4ed021629"
