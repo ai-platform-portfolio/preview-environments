@@ -1,0 +1,12 @@
+# Minimal registration intent. The platform supplies Azure/Atlas metadata at render time.
+platform:
+  argocd:
+    repository: https://github.com/ai-platform-portfolio/preview-environments.git
+    environments:
+      enabled: true
+      targets:
+        staging: {hostname: poc-staging.dev.michaelalinks.com}
+        production: {hostname: poc-production.dev.michaelalinks.com, from: staging}
+
+  kargo:
+    enabled: true
