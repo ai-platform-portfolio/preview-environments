@@ -68,6 +68,7 @@ def readyz() -> dict[str, str]:
 
 @app.post("/api/messages", response_model=Message, status_code=201)
 def create_message(body: NewMessage):
+    # The database returns the stored row for the browser's read-after-write check.
     with connect() as connection:
         return connection.execute(
             "INSERT INTO public.messages (id, text) VALUES (%s, %s) "
