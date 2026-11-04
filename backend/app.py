@@ -54,11 +54,13 @@ def database_error(request, exc):
 
 @app.get("/api/healthz")
 def healthz() -> dict[str, str]:
+    # Keep liveness independent of the database readiness check.
     return {"status": "ok"}
 
 
 @app.get("/api/readyz")
 def readyz() -> dict[str, str]:
+    # Readiness confirms the shared schema before a candidate can receive traffic.
     with connect() as connection:
         connection.execute("SELECT id, text, created_at FROM public.messages LIMIT 0")
     return {"status": "ready"}
@@ -66,6 +68,7 @@ def readyz() -> dict[str, str]:
 
 @app.post("/api/messages", response_model=Message, status_code=201)
 def create_message(body: NewMessage):
+    # The database returns the stored row for the browser's read-after-write check.
     with connect() as connection:
         return connection.execute(
             "INSERT INTO public.messages (id, text) VALUES (%s, %s) "
