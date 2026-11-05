@@ -272,6 +272,31 @@ supply these SQL grants. That integration must be resolved explicitly in the
 later delivery PR. This local fixture is not a production role-management layer,
 and does not adopt or change existing platform database objects.
 
+## Protected schema downgrade drill
+
+`20261105220500_describe_messages.sql` adds table metadata. Its inverse removes
+the comment while preserving messages; reverting the initial table-creation
+migration would remove application data and is not this drill.
+
+Use isolated recovery capacity after validating its restored data and migration
+history. The platform operator renders the existing application-chart
+`AtlasMigration` template against that copy, applies this directory version, and
+records message counts/content and the applied revision. Source environments keep
+their current release pins.
+
+Preview the inverse SQL before requesting a down migration. Require the Registry's
+Protected Flows policy to protect `atlas migrate down` with one human approval.
+Enable the chart's existing `platform.atlas.migrateDown.allow` only for this
+isolated resource, then select the prior directory tag. Verify the operator waits
+for approval; the reviewer must inspect the actual plan before approving it.
+After execution, confirm the comment is gone, the initial revision remains and
+message data is unchanged. Keep identity/access downgrades blocked. Remove the
+temporary migration resource and recovery capacity through their normal owners.
+
+This is the validation procedure; the migration's presence does not prove that
+the approval gate or a live downgrade has passed. Atlas approval support depends
+on the account entitlement; the current portfolio account is on a Trial.
+
 ## Stop or reset
 
 ```sh
