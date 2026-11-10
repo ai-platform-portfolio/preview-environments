@@ -126,6 +126,7 @@ jobs:
           env: ci
 
   frontend:
+    name: Build frontend image
     needs: [source, validate]
     permissions:
       contents: read
@@ -144,6 +145,7 @@ jobs:
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
   backend:
+    name: Build backend image
     needs: [source, validate]
     permissions:
       contents: read
