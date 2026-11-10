@@ -82,10 +82,10 @@ jobs:
       # Same YAML parser as the existing platform validation tooling.
       - run: python3 -m pip install PyYAML==6.0.3
 
-      - name: Test artifact and release handoff guards
+      - name: Test publication and source contracts
         env:
           APPLICATION_CHART: .application-chart
-        run: python3 -m unittest discover -s tests -p 'test_publication.py' -v
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
 
       - uses: ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea
         with:
