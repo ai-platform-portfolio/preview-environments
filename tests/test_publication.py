@@ -1,13 +1,16 @@
 """Publication safety checks using temporary Git and a fake GitHub API."""
 
+from contextlib import chdir
 import hashlib
 import json
 import os
+import runpy
 import shutil
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import Mock, patch
 
 import yaml
 
@@ -103,6 +106,36 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(values["platform"]["atlas"]["rolePlanRepository"], outputs["role-repository"])
         self.assertTrue(outputs["role-repository"].endswith("-roles"))
         self.assertEqual(yaml.safe_load((self.repo / "deploy/values.yaml").read_text()), base)
+
+    def test_reader_intent_resolves_only_the_selected_preview_and_pinned_principal(self):
+        self.run_script("write-artifact-record.sh")
+        module = runpy.run_path(str(ROOT / "scripts/write-release-values.py"))
+        write_release = module["write_release"]
+        intent = self.repo / "deploy/preview-readers.yaml"
+        readers = '"42": [test-reader]\n'
+        intent.write_text(readers)
+        endpoint = "https://example.services.ai.azure.com/api/projects/management"
+        principal = "00000000-0000-1111-2222-333333333333"
+        cluster = "/subscriptions/test/resourceGroups/example/providers/Microsoft.ContainerService/managedClusters/example"
+        route = {"agent_endpoint": {"version_selector": {"version_selection_rules": [
+            {"type": "FixedRatio", "agent_version": "6", "traffic_percentage": 100},
+        ]}}}
+        azure = Mock(side_effect=[
+            route, {"name": "test-reader", "version": "6", "instance_identity": {"principal_id": principal}}, cluster,
+        ])
+        with chdir(self.repo), patch.dict(os.environ, {
+            **self.env, "FOUNDRY_PROJECT_ENDPOINT": endpoint, "AKS_RESOURCE_GROUP": "example", "AKS_NAME": "example",
+        }), patch.dict(write_release.__globals__, {"azure_json": azure}):
+            with patch.dict(os.environ, {"PR_NUMBER": "43"}):
+                write_release()
+                values = yaml.safe_load((self.repo / "release-values.yaml").read_text())
+                self.assertNotIn("azure", values["platform"])
+                azure.assert_not_called()
+            write_release()
+            values = yaml.safe_load((self.repo / "release-values.yaml").read_text())
+            self.assertEqual(values["platform"]["azure"],
+                             {"aksArmId": cluster, "workloadReaders": {"test-reader": principal}})
+            self.assertIn("/agents/test-reader/versions/6?api-version=v1", azure.call_args_list[1].args[2])
 
     def test_release_isolation_and_ordering(self):
         one, first = self.release()
